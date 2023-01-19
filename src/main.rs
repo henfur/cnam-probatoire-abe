@@ -95,9 +95,9 @@ fn get_shared_files() -> String {
 fn get_secret_key(attributes:  String) -> String {
     println!("Generating secret key for attributes : {}", &attributes);
 
-    let policy = String::from(&attributes);
+    // let policy = String::from(&attributes);
 
-    let keygen_res = keygen(PKG_MASTER_DIR_PATH, &policy);
+    let keygen_res = keygen(PKG_MASTER_DIR_PATH, &attributes);
     match keygen_res {
         Ok(secret_key) => secret_key,
         Err(e)=>{
@@ -110,7 +110,7 @@ fn get_secret_key(attributes:  String) -> String {
 #[derive(FromForm)]
 struct UploadData<'r> {
     file: TempFile<'r>,
-    attributes: String
+    policy: String
 }
 
 /// Handles APK files upload to the server
@@ -130,7 +130,7 @@ async fn upload_file(mut upload_data: Form<UploadData<'_>>) -> String {
     let filepath = Path::new(&filename);
     upload_data.file.copy_to(&filename).await;
 
-    let encrypt_res = encrypt_file(PKG_MASTER_DIR_PATH, &filename, &upload_data.attributes);
+    let encrypt_res = encrypt_file(PKG_MASTER_DIR_PATH, &filename, &upload_data.policy);
     
     let msk_exists = filepath.exists();
 
@@ -167,7 +167,9 @@ fn get_file(decryption_data: Json<DecryptionData>) -> Result<File, ()> {
 
     let decrypt_res = decrypt_file(&file_path_string, &decryption_data.secret_key);
     match decrypt_res {
-        Ok(file)=> Ok(file),
+        Ok(file)=> {
+            Ok(file)
+        },
         Err(_) => Err(())
     }
 }

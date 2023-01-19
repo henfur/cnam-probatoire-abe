@@ -8,6 +8,7 @@ extern crate serde;
 
 extern crate rustc_hex as hex;
 
+use std::fs::remove_file;
 use std::{fs::File};
 use std::io::Write;
 
@@ -37,14 +38,11 @@ use serde_cbor::{
 };
 
 // File extensions
-const CIPHERTEXT_EXTENSION: &'static str = "ct";
-const KEY_EXTENSION: &'static str = "key";
-const DOT: &'static str = ".";
+const CIPHERTEXT_EXTENSION: &'static str = ".ct";
 
 // Default file names
-const MASTER_SECRET_KEY_FILE: &'static str = "msk";
-const PUBLIC_KEY_FILE: &'static str = "pk";
-const SECRET_KEY_FILE: &'static str = "sk";
+const MASTER_SECRET_KEY_FILE: &'static str = "msk.key";
+const PUBLIC_KEY_FILE: &'static str = "pk.key";
 
 // Key file header and footer
 const SK_BEGIN: &'static str = "-----BEGIN SK-----\n";
@@ -60,17 +58,12 @@ const CT_END: &'static str = "\n-----END CT-----";
 pub fn setup_pkg(key_path: &str) -> Result<(), RabeError> {
     let mut master_secret_key_file = String::from("");
     let mut public_key_file = String::from("");
-    let mut _gp_file = String::from("");
     
     master_secret_key_file.push_str(key_path);
     master_secret_key_file.push_str(&MASTER_SECRET_KEY_FILE);
-    master_secret_key_file.push_str(&DOT);
-    master_secret_key_file.push_str(&KEY_EXTENSION);
     
     public_key_file.push_str(key_path);
     public_key_file.push_str(&PUBLIC_KEY_FILE);
-    public_key_file.push_str(&DOT);
-    public_key_file.push_str(&KEY_EXTENSION);
 
     let (_pk, _msk) = ac17::setup();
     write_file(
@@ -86,60 +79,51 @@ pub fn setup_pkg(key_path: &str) -> Result<(), RabeError> {
 
 pub fn keygen(
     pkg_master_path: &'static str,
-    policy: &String
+    attributes: &String
 ) -> Result<String, RabeError> {
-    let mut secret_key_file = String::from("");
     
     let mut master_secret_key_file = String::from(pkg_master_path);
     master_secret_key_file.push_str(&MASTER_SECRET_KEY_FILE);
-    master_secret_key_file.push_str(&DOT);
-    master_secret_key_file.push_str(&KEY_EXTENSION);
 
-    secret_key_file.push_str(&SECRET_KEY_FILE);
-    secret_key_file.push_str(&DOT);
-    secret_key_file.push_str(&KEY_EXTENSION);
-
-    let _msk: ac17::Ac17MasterKey = match ser_dec(&master_secret_key_file) {
+    let master_secret_key: ac17::Ac17MasterKey = match ser_dec(&master_secret_key_file) {
         Ok(parsed) => parsed,
-        Err(e) => return Err(e)
+        Err(e) => panic!("{}", e.to_string())
     };
-    let _sk: ac17::Ac17KpSecretKey = ac17::kp_keygen(&_msk, policy, PolicyLanguage::JsonPolicy).unwrap();
-
-    let secret_key_string: String = ser_enc(_sk, SK_BEGIN, SK_END);
-
-    Ok(secret_key_string)
-}
-
-pub fn encrypt_file(
-    pkg_master_path: &'static str,
-    file_name: &String,
-    attributes: &String
-) -> Result<(), RabeError> {
-    let mut public_key_file = String::from("");
-
-    public_key_file.push_str(pkg_master_path);
-    public_key_file.push_str(&PUBLIC_KEY_FILE);
-    public_key_file.push_str(&DOT);
-    public_key_file.push_str(&KEY_EXTENSION);
-
-    let plaintext_file = String::from(file_name);
-    let mut ciphertext_file = plaintext_file.to_string();
-    ciphertext_file.push_str(&DOT);
-    ciphertext_file.push_str(&CIPHERTEXT_EXTENSION);
- 
-    let buffer: Vec<u8> = read_to_vec(Path::new(&plaintext_file));
-
-    let _public_key: ac17::Ac17PublicKey = match ser_dec(&public_key_file) {
-        Ok(parsed) => parsed,
-        Err(e) => return Err(e)
-    };
+    println!("... done");
+    print!("creating AC17CP sk for {:?} ...", attributes);
 
     let mut attributes_vector: Vec<String> = vec![];
     for attr in attributes.split(',') {
         attributes_vector.push(attr.to_string());
     }
+    
+    let secret_key: ac17::Ac17CpSecretKey = ac17::cp_keygen(&master_secret_key, &attributes_vector).unwrap();
 
-    let ciphertext = ac17::kp_encrypt(&_public_key, &attributes_vector, &buffer).unwrap();
+    Ok(ser_enc(secret_key, SK_BEGIN, SK_END))
+}
+
+pub fn encrypt_file(
+    pkg_master_path: &'static str,
+    file_name: &String,
+    policy: &String
+) -> Result<(), RabeError> {
+    let mut public_key_file = String::from("");
+
+    public_key_file.push_str(pkg_master_path);
+    public_key_file.push_str(&PUBLIC_KEY_FILE);
+
+    let plaintext_file = String::from(file_name);
+    let mut ciphertext_file = plaintext_file.to_string();
+    ciphertext_file.push_str(&CIPHERTEXT_EXTENSION);
+ 
+    let buffer: Vec<u8> = read_to_vec(Path::new(&plaintext_file));
+
+    let public_key: ac17::Ac17PublicKey = match ser_dec(&public_key_file) {
+        Ok(parsed) => parsed,
+        Err(e) => return Err(e)
+    };
+
+    let ciphertext = ac17::cp_encrypt(&public_key, &policy, &buffer, PolicyLanguage::JsonPolicy).unwrap();
 
     write_file(
         Path::new(&ciphertext_file),
@@ -156,17 +140,17 @@ pub fn decrypt_file(
     let plaintext_file: String = String::from("./tmp/plaintext_file");
     let plaintext_option: Result<Vec<u8>, RabeError>;
 
-    let secret_key: ac17::Ac17KpSecretKey = match ser_dec_from_string(encoded_secret_key) {
+    let secret_key: ac17::Ac17CpSecretKey = match ser_dec_from_string(encoded_secret_key) {
         Ok(parsed) => parsed,
         Err(e) => return Err(e)
     };
 
-    let ciphertext: ac17::Ac17KpCiphertext = match ser_dec(ciphertext_file) {
+    let ciphertext: ac17::Ac17CpCiphertext = match ser_dec(ciphertext_file) {
         Ok(parsed) => parsed,
         Err(e) => return Err(e)
     };
 
-    plaintext_option = ac17::kp_decrypt(&secret_key, &ciphertext);
+    plaintext_option = ac17::cp_decrypt(&secret_key, &ciphertext);
     let plaintext_file_path = Path::new(&plaintext_file);
 
     match plaintext_option {
@@ -176,7 +160,10 @@ pub fn decrypt_file(
         Ok(_pt_u) => {
             create_and_write_from_vec(&plaintext_file_path, &_pt_u);
             match File::open(&plaintext_file_path) {
-                Ok(file) => Ok(file),
+                Ok(file) => {
+                    remove_file(plaintext_file_path);
+                    Ok(file)
+                },
                 Err(_) => Err(RabeError::new("Error opening plaintext file"))
             }
         }
