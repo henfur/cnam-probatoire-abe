@@ -45,7 +45,7 @@ const LISTEN_PORT: &'static str = "8000";
 // File management constants
 const UPLOAD_PATH: &'static str = "./upload/";
 // PKG Parameters
-const PKG_MASTER_DIR_PATH: &'static str = "./pkg/master/";
+const PKG_MASTER_DIR_PATH: &'static str = "./pkg/";
 
 #[derive(FromForm, Deserialize, Serialize)]
 struct UserData {
@@ -58,9 +58,14 @@ struct UserData {
 // Starts the webserver
 #[launch]
 fn rocket() -> _ {
-    let msk_exists = std::path::Path::new("./pkg/master/msk.key").exists();
+    let msk_exists = std::path::Path::new("./pkg/msk.key").try_exists();
 
-    if ! msk_exists {
+    let init_pkg = match msk_exists {
+        Ok(file_exists) => ! file_exists,
+        Err(_) => panic!("Could not access pkg/ (Create the directories if they don't exist)"),
+    };
+
+    if init_pkg {
         let setup_res: Result<(), RabeError> = setup_pkg(&PKG_MASTER_DIR_PATH);
 
         match setup_res {
