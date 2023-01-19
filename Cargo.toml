@@ -1,0 +1,29 @@
+[package]
+name = "server"
+version = "0.2.0"
+edition = "2021"
+description = "POC of MAM server with ABE"
+authors = [
+    "henfur <henfur@protonmail.com>",
+]
+keywords = ["mam","cryptography", "abe", "rust"]
+license = "MIT"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rabe = { path = "./lib/rabe" }
+# rocket = "0.4.11"
+rocket = { version = "0.5.0-rc.2", features = ["json"] }
+rocket_contrib = "0.4.11"
+rustc-hex = "2.1.0"
+deflate = "0.9.0"
+inflate = "0.4.5"
+clap = "2.33.3"
+rand = "0.8.5"
+serde = { version = "1.0" }
+serde_cbor = { version = "0.11.2"}
+pest = "2.0"
+pest_derive = "2.0"
+openssl = { version = "0.10" }

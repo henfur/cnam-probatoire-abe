@@ -1,0 +1,3 @@
+[submodule "rabe"]
+	path = lib/rabe
+	url = https://github.com/Fraunhofer-AISEC/rabe.git
