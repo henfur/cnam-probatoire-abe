@@ -5,5 +5,7 @@ port = 8000
 [default.limits]
 form = "100 MiB"
 json = "10 MiB"
-msgpack = "2 MiB"
+msgpack = "100 MiB"
 file = "100 MiB"
+app_pkg = "100 MiB"
+data-form = "100 MiB"

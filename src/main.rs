@@ -12,15 +12,12 @@ extern crate rustc_hex as hex;
 
 use std::{
     fs::{File, self},
-    fs::remove_file,
-    path::Path,
 };
 
 use rabe::error::RabeError;
 use rocket::{
     serde::json::Json,
     form::Form,
-    fs::TempFile
 };
 
 use serde::{
@@ -36,12 +33,6 @@ use encryption::{
     decrypt_file
 };
 
-mod file_id;
-use file_id::FileId;
-
-//Network parameters
-const LISTEN_ADDR: &'static str = "localhost";
-const LISTEN_PORT: &'static str = "8000";
 // File management constants
 const UPLOAD_PATH: &'static str = "./upload/";
 // PKG Parameters
@@ -95,8 +86,6 @@ fn get_shared_files() -> String {
 fn get_secret_key(attributes:  String) -> String {
     println!("Generating secret key for attributes : {}", &attributes);
 
-    // let policy = String::from(&attributes);
-
     let keygen_res = keygen(PKG_MASTER_DIR_PATH, &attributes);
     match keygen_res {
         Ok(secret_key) => secret_key,
@@ -107,42 +96,64 @@ fn get_secret_key(attributes:  String) -> String {
     }
 }
 
+use rocket::data::ToByteUnit;
+use rocket::form::{self, FromFormField, DataField, ValueField};
+// use memchr::memchr;
+
+struct AppPkg<'r> {
+    data: &'r [u8]
+}
+
+#[rocket::async_trait]
+impl<'r> FromFormField<'r> for AppPkg<'r> {
+    fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
+        Ok(
+            AppPkg {data: field.value.as_bytes()}
+        )
+    }
+    
+    async fn from_data(field: DataField<'r, '_>) -> form::Result<'r, Self> {
+        // Retrieve the configured data limit or use `256KiB` as default.
+        let limit = field.request.limits()
+            .get("app_pkg")
+            .unwrap_or(256.mebibytes());
+
+        // Read the capped data stream, returning a limit error as needed.
+        let bytes = field.data.open(limit).into_bytes().await?;
+        if !bytes.is_complete() {
+            println!("Test");
+            Err((None, Some(limit)))?;
+        }
+
+        // Store the bytes in request-local cache and split at ':'.
+        let bytes = bytes.into_inner();
+        let bytes = rocket::request::local_cache!(field.request, bytes);
+
+        // Try to parse the name as UTF-8 or return an error if it fails.
+        Ok(AppPkg { data: bytes })
+    }
+}
+
 #[derive(FromForm)]
 struct UploadData<'r> {
-    file: TempFile<'r>,
-    policy: String
+    policy: String,
+    file: AppPkg<'r>
 }
+
 
 /// Handles APK files upload to the server
 ///
 /// # Arguments
 ///
-///	* `sent_file` - APK format file
-/// * `_content_type` - Value of the Content-Type header from the HTTP request. Its value is checked beforehand by the RequestContentType implementation
+///	* `upload_data` - UploadData struct matching the fields of the form 
+///    - policy as a JSON string
+///    - file as AppPkg struct 
 ///
-// #[post("/uploadFile", format = "plain", data = "<upload_data>")]
-#[post("/uploadFile", data = "<upload_data>")]
-async fn upload_file(mut upload_data: Form<UploadData<'_>>) -> String {
-
-    let id = FileId::new(32);
-    let filename = format!("{upload_dir}{id}",upload_dir = UPLOAD_PATH, id = id);
-    
-    let filepath = Path::new(&filename);
-    upload_data.file.copy_to(&filename).await;
-
-    let encrypt_res = encrypt_file(PKG_MASTER_DIR_PATH, &filename, &upload_data.policy);
-    
-    let msk_exists = filepath.exists();
-
-    if msk_exists {
-        remove_file(filepath);
-    }
-    match encrypt_res {
-        Ok(())=> id.to_string(),
-        Err(e)=>{
-            println!("Error occured: {}", e);
-            "Could not encrypt file".to_string()
-        }
+#[post("/uploadFile", format = "multipart/form-data", data = "<upload_data>")]
+fn upload_file(upload_data: Form<UploadData<'_>>) -> String {
+    match encrypt_file(PKG_MASTER_DIR_PATH, upload_data.file.data, &upload_data.policy) {
+        Ok(file_id) => file_id,
+        Err(e) => e.to_string()
     }
 }
 
@@ -156,12 +167,12 @@ struct DecryptionData{
 /// TODO: Need to add a database to store the original associated to the encrypted file ID
 /// # Arguments
 ///
-///	* `decryption_data` - JSON formated data matching the attributes of the FileData struct
+///	* `decryption_data` - JSON formated data matching the attributes of the DecryptionData struct
 ///
 #[post("/getFile", format = "application/json", data = "<decryption_data>")]
 fn get_file(decryption_data: Json<DecryptionData>) -> Result<File, String> {
 
-    let mut file_path_string = "./upload/".to_string();
+    let mut file_path_string = UPLOAD_PATH.to_string();
     file_path_string.push_str(&decryption_data.id);
     file_path_string.push_str(".ct");
 

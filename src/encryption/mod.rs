@@ -18,7 +18,7 @@ use crate::rabe::{
     schemes::ac17,
     utils::{
         policy::pest::PolicyLanguage,
-        file::{write_file, read_file, read_raw, read_to_vec}
+        file::{write_file, read_file, read_raw}
     }
 };
 
@@ -37,12 +37,17 @@ use serde_cbor::{
     from_slice
 };
 
+use uuid::Uuid;
+
 // File extensions
 const CIPHERTEXT_EXTENSION: &'static str = ".ct";
 
 // Default file names
 const MASTER_SECRET_KEY_FILE: &'static str = "msk.key";
 const PUBLIC_KEY_FILE: &'static str = "pk.key";
+
+//Uploads
+const UPLOAD_PATH: &'static str = "upload/";
 
 // Key file header and footer
 const SK_BEGIN: &'static str = "-----BEGIN SK-----\n";
@@ -104,33 +109,32 @@ pub fn keygen(
 
 pub fn encrypt_file(
     pkg_master_path: &'static str,
-    file_name: &String,
+    file_buffer: &[u8],
     policy: &String
-) -> Result<(), RabeError> {
+) -> Result<String, RabeError> {
     let mut public_key_file = String::from("");
 
     public_key_file.push_str(pkg_master_path);
     public_key_file.push_str(&PUBLIC_KEY_FILE);
 
-    let plaintext_file = String::from(file_name);
-    let mut ciphertext_file = plaintext_file.to_string();
+    let file_id = Uuid::new_v4().as_simple().to_string();
+    let mut ciphertext_file = String::from(UPLOAD_PATH.to_string());
+    ciphertext_file.push_str(file_id.as_str());
     ciphertext_file.push_str(&CIPHERTEXT_EXTENSION);
  
-    let buffer: Vec<u8> = read_to_vec(Path::new(&plaintext_file));
-
     let public_key: ac17::Ac17PublicKey = match ser_dec(&public_key_file) {
         Ok(parsed) => parsed,
         Err(e) => return Err(e)
     };
 
-    let ciphertext = ac17::cp_encrypt(&public_key, &policy, &buffer, PolicyLanguage::JsonPolicy).unwrap();
+    let ciphertext = ac17::cp_encrypt(&public_key, &policy, file_buffer, PolicyLanguage::JsonPolicy).unwrap();
 
     write_file(
         Path::new(&ciphertext_file),
         ser_enc(&ciphertext, CT_BEGIN, CT_END)
     );
 
-    Ok(())
+    Ok(file_id)
 }
 
 pub fn decrypt_file(
