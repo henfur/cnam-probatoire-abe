@@ -159,7 +159,7 @@ struct DecryptionData{
 ///	* `decryption_data` - JSON formated data matching the attributes of the FileData struct
 ///
 #[post("/getFile", format = "application/json", data = "<decryption_data>")]
-fn get_file(decryption_data: Json<DecryptionData>) -> Result<File, ()> {
+fn get_file(decryption_data: Json<DecryptionData>) -> Result<File, String> {
 
     let mut file_path_string = "./upload/".to_string();
     file_path_string.push_str(&decryption_data.id);
@@ -170,6 +170,6 @@ fn get_file(decryption_data: Json<DecryptionData>) -> Result<File, ()> {
         Ok(file)=> {
             Ok(file)
         },
-        Err(_) => Err(())
+        Err(e) => Err(e.to_string())
     }
 }
