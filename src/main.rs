@@ -10,9 +10,7 @@ extern crate serde_cbor;
 
 extern crate rustc_hex as hex;
 
-use std::{
-    fs::{File, self},
-};
+use std::fs;
 
 use rabe::error::RabeError;
 use rocket::{
@@ -170,7 +168,7 @@ struct DecryptionData{
 ///	* `decryption_data` - JSON formated data matching the attributes of the DecryptionData struct
 ///
 #[post("/getFile", format = "application/json", data = "<decryption_data>")]
-fn get_file(decryption_data: Json<DecryptionData>) -> Result<File, String> {
+fn get_file(decryption_data: Json<DecryptionData>) -> Result<Vec<u8>, String> {
 
     let mut file_path_string = UPLOAD_PATH.to_string();
     file_path_string.push_str(&decryption_data.id);

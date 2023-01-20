@@ -8,10 +8,6 @@ extern crate serde;
 
 extern crate rustc_hex as hex;
 
-use std::fs::remove_file;
-use std::{fs::File};
-use std::io::Write;
-
 use hex::{FromHex, ToHex};
 use crate::rabe::{
     error::RabeError,
@@ -140,8 +136,7 @@ pub fn encrypt_file(
 pub fn decrypt_file(
     ciphertext_file: &String,
     encoded_secret_key: &String,
-) -> Result<File, RabeError> {
-    let plaintext_file: String = String::from("./tmp/plaintext_file");
+) -> Result<Vec<u8>, RabeError> {
     let plaintext_option: Result<Vec<u8>, RabeError>;
 
     let secret_key: ac17::Ac17CpSecretKey = match ser_dec_from_string(encoded_secret_key) {
@@ -155,41 +150,12 @@ pub fn decrypt_file(
     };
 
     plaintext_option = ac17::cp_decrypt(&secret_key, &ciphertext);
-    let plaintext_file_path = Path::new(&plaintext_file);
 
     match plaintext_option {
         Err(e) => {
-            return Err(e);
+            Err(RabeError::new(e.to_string().as_str()))
         }
-        Ok(_pt_u) => {
-            create_and_write_from_vec(&plaintext_file_path, &_pt_u);
-            match File::open(&plaintext_file_path) {
-                Ok(file) => {
-                    remove_file(plaintext_file_path);
-                    Ok(file)
-                },
-                Err(_) => Err(RabeError::new("Error opening plaintext file"))
-            }
-        }
-    }
-}
-
-// Modified version of the utils function (Replace File::open by File::create)
-fn create_and_write_from_vec(_file_path: &Path, _data: &Vec<u8>) {
-    let display = _file_path.display();
-    let mut file = match File::create(_file_path) {
-        Err(why) => panic!("sorry, couldn't open {}: {}", display, why.to_string()),
-        Ok(file) => file,
-    };
-    match file.write_all(&_data) {
-        Err(why) => {
-            panic!(
-                "sorry, couldn't write to {}: {}",
-                display,
-                why.to_string()
-            )
-        }
-        Ok(_) => println!("successfully wrote to {}", display),
+        Ok(_pt_u) => Ok(_pt_u)
     }
 }
 
