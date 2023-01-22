@@ -14,7 +14,6 @@ readme = "README.md"
 
 [dependencies]
 rabe = { path = "./lib/rabe" }
-# rocket = "0.4.11"
 rocket = { version = "0.5.0-rc.2", features = ["json"] }
 rocket_contrib = "0.4.11"
 rustc-hex = "2.1.0"

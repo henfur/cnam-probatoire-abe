@@ -1,16 +1,19 @@
-FROM rust:latest
+FROM rustlang/rust:nightly
+
+RUN groupadd -r mam && useradd --no-log-init -r -g mam mam
 
 WORKDIR /app
 
-RUN mkdir -p 0700 /app/{src,lib,pkg/{master,clients}}
+COPY --chown=mam:mam ./src /app/src
+COPY --chown=mam:mam ./lib /app/lib
+COPY --chown=mam:mam ./upload /app/upload
+COPY --chown=mam:mam ./pkg /app/pkg
+COPY --chown=mam:mam ./Cargo.toml /app/Cargo.toml
+COPY --chown=mam:mam ./Rocket.toml /app/Rocket.toml
 
-COPY . /app/
+RUN chown -R mam:mam /app
 
-# COPY src/* /app/src/
-
-# COPY Cargo.toml /app/Cargo.toml
-
-# COPY lib/* /app/lib/
+USER mam:mam
 
 RUN cargo build --release
 
