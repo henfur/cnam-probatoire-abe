@@ -1,7 +1,7 @@
 {
 	"info": {
-		"_postman_id": "86dd6f4d-dee7-4b62-99bb-bd5887a6b204",
-		"name": "Probatoire",
+		"_postman_id": "a77bd685-f74e-41ee-8a87-06c391456a12",
+		"name": "Probatoire Copy",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -26,11 +26,11 @@
 						{
 							"key": "file",
 							"type": "file",
-							"src": "/home/henfur/tmp/testfile.txt"
+							"src": []
 						},
 						{
-							"key": "attributes",
-							"value": "A,B",
+							"key": "policy",
+							"value": "{\"name\": \"and\", \"children\": [{\"name\": \"A\"}, {\"name\": \"B\"}]}",
 							"type": "text"
 						}
 					]
@@ -56,13 +56,13 @@
 				"header": [
 					{
 						"key": "Content-Type",
-						"value": "application/json",
+						"value": "text/plain",
 						"type": "default"
 					}
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\"name\": \"and\", \"children\": [{\"name\": \"A\"}, {\"name\": \"B\"}]}",
+					"raw": "A,B",
 					"options": {
 						"raw": {
 							"language": "text"
