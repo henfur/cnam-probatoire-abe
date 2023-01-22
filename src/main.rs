@@ -31,16 +31,61 @@ use encryption::{
     decrypt_file
 };
 
+use rocket::data::ToByteUnit;
+use rocket::form::{self, FromFormField, DataField, ValueField};
+
 // File management constants
 const UPLOAD_PATH: &'static str = "./upload/";
 // PKG Parameters
 const PKG_MASTER_DIR_PATH: &'static str = "./pkg/";
+
+struct AppPkg<'r> {
+    data: &'r [u8]
+}
+
+#[rocket::async_trait]
+impl<'r> FromFormField<'r> for AppPkg<'r> {
+    fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
+        Ok(
+            AppPkg {data: field.value.as_bytes()}
+        )
+    }
+    
+    async fn from_data(field: DataField<'r, '_>) -> form::Result<'r, Self> {
+        let limit = field.request.limits()
+            .get("app_pkg")
+            .unwrap_or(256.mebibytes());
+
+        let bytes = field.data.open(limit).into_bytes().await?;
+        if !bytes.is_complete() {
+            println!("Test");
+            Err((None, Some(limit)))?;
+        }
+
+        let bytes = bytes.into_inner();
+        let bytes = rocket::request::local_cache!(field.request, bytes);
+
+        Ok(AppPkg { data: bytes })
+    }
+}
+
+#[derive(FromForm)]
+struct UploadData<'r> {
+    policy: String,
+    file: AppPkg<'r>
+}
 
 #[derive(FromForm, Deserialize, Serialize)]
 struct UserData {
     username: String,
     api_key: String,
     attributes: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+struct DecryptionData{
+    id: String,
+    secret_key: String
 }
 
 // Initializes PKG keys if they don't exist
@@ -80,6 +125,12 @@ fn get_shared_files() -> String {
     return file_list;
 }
 
+/// Generates and sends secretKey to user
+///
+/// # Arguments
+///
+///	* `attributes` - String of attributes in the following format: "A,B"
+///
 #[post("/getSecretKey", format="text/plain", data="<attributes>")]
 fn get_secret_key(attributes:  String) -> String {
     println!("Generating secret key for attributes : {}", &attributes);
@@ -93,51 +144,6 @@ fn get_secret_key(attributes:  String) -> String {
         }
     }
 }
-
-use rocket::data::ToByteUnit;
-use rocket::form::{self, FromFormField, DataField, ValueField};
-// use memchr::memchr;
-
-struct AppPkg<'r> {
-    data: &'r [u8]
-}
-
-#[rocket::async_trait]
-impl<'r> FromFormField<'r> for AppPkg<'r> {
-    fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
-        Ok(
-            AppPkg {data: field.value.as_bytes()}
-        )
-    }
-    
-    async fn from_data(field: DataField<'r, '_>) -> form::Result<'r, Self> {
-        // Retrieve the configured data limit or use `256KiB` as default.
-        let limit = field.request.limits()
-            .get("app_pkg")
-            .unwrap_or(256.mebibytes());
-
-        // Read the capped data stream, returning a limit error as needed.
-        let bytes = field.data.open(limit).into_bytes().await?;
-        if !bytes.is_complete() {
-            println!("Test");
-            Err((None, Some(limit)))?;
-        }
-
-        // Store the bytes in request-local cache and split at ':'.
-        let bytes = bytes.into_inner();
-        let bytes = rocket::request::local_cache!(field.request, bytes);
-
-        // Try to parse the name as UTF-8 or return an error if it fails.
-        Ok(AppPkg { data: bytes })
-    }
-}
-
-#[derive(FromForm)]
-struct UploadData<'r> {
-    policy: String,
-    file: AppPkg<'r>
-}
-
 
 /// Handles APK files upload to the server
 ///
@@ -153,12 +159,6 @@ fn upload_file(upload_data: Form<UploadData<'_>>) -> String {
         Ok(file_id) => file_id,
         Err(e) => e.to_string()
     }
-}
-
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-struct DecryptionData{
-    id: String,
-    secret_key: String
 }
 
 /// Returns a plaintext file given the right secret key and file ID
