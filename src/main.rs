@@ -12,10 +12,12 @@ extern crate rustc_hex as hex;
 
 use std::fs;
 
+use model::{User, establish_connection};
 use rabe::error::RabeError;
 use rocket::{
     serde::json::Json,
-    form::Form,
+    form::Form, Response,
+    response::status,
 };
 
 mod encryption;
@@ -31,6 +33,11 @@ use form_data::{
     DecryptionData,
     UploadData
 };
+
+pub mod model;
+use model::*;
+pub mod schema;
+
 
 // File management constants
 const UPLOAD_PATH: &'static str = "./upload/";
@@ -131,4 +138,16 @@ fn get_file(decryption_data: Json<DecryptionData>) -> Result<Vec<u8>, String> {
         },
         Err(e) => Err(e.to_string())
     }
+}
+
+#[post("/addUser", format = "application/json", data="<user_creation_data>")]
+fn add_user(user_creation_data: Json<NewUser>) -> Result<status::Accepted<&str>, status::Forbidden<()>> {
+    let conn = &mut establish_connection();
+
+    let username = user_creation_data.username;
+    let email = user_creation_data.email;
+
+    create_user(conn, username, email);
+
+    Ok(status::Accepted(Some("User created")))
 }

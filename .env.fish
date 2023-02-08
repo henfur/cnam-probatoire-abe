@@ -1,0 +1,1 @@
+set DATABASE_URL mysql://root:changeit@127.0.0.1:13306/mam

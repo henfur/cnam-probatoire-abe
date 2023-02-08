@@ -27,6 +27,8 @@ pest = "2.0"
 pest_derive = "2.0"
 openssl = { version = "0.10" }
 memchr = "2.5.0"
+diesel = { version = "2.0.0", features = ["mysql_backend", "mysql"] }
+dotenvy = "0.15"
 
 [dependencies.uuid]
 version = "1.2.2"
