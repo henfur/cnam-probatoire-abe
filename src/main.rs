@@ -121,34 +121,33 @@ fn get_secret_key(attributes:  String) -> String {
 fn upload_file(upload_data: Form<UploadData<'_>>) -> String {
     match encrypt_file(PKG_MASTER_DIR_PATH, upload_data.file.data, &upload_data.policy) {
         Ok(file_id) => {
-            let conn = &mut establish_connection();
+            // let conn = &mut establish_connection();
             // create_ciphertext_file(conn, upload_data.file.data., &file_id.as_str());
             use std::io::Write;
-            use std::os::unix::net::UnixStream;
             use memfile::{MemFile, CreateOptions, Seal};
 
-
+            
             let mut temp_memfile = MemFile::create(&file_id, CreateOptions::new().allow_sealing(true)).unwrap();
             temp_memfile.write_all(upload_data.file.data);
             temp_memfile.add_seals(Seal::Write | Seal::Shrink | Seal::Grow).unwrap();
-
-            let socket = std::path::Path::new("/tmp/mysocket");
-            let mut stream = UnixStream::connect(&socket).unwrap();
-            stream.write_all(upload_data.file.data).unwrap();
-
-            // android_tools::aapt2::Aapt2Dump::new("badging", &temp_memfile);
-
-            // android_tools::aapt2::Aapt2Dump::
-            // let temp_fd = &temp_memfile.as_raw_fd();
-
-            // let mut fd_path = String::from("/proc/");
-            // fd_path.push_str(&temp_fd.to_string());
-            // println!("{}", &temp_fd.to_string());
-            // // thread::sleep(std::time::Duration::from_secs(1000));
-            let aapt_output = Command::new("aapt dump badging").arg("/tmp/mysocket").output().expect("Failed");
+            
+            let current_pid = std::process::id();
+            println!("{}", std::process::id());
+            
+            let mut apk_path_string = String::from("/proc/");
+            apk_path_string.push_str(current_pid.to_string().as_str());
+            apk_path_string.push_str("/fd/");
+            apk_path_string.push_str(&temp_memfile.as_raw_fd().to_string().as_str());
+            
+            println!("{}", apk_path_string);            
+            let aapt_output = Command::new("aapt2")
+                .arg("dump")
+                .arg("badging")
+                .arg(&apk_path_string).output().expect("Failed");
             println!("status: {}", aapt_output.status);
             println!("stdout: {}", String::from_utf8_lossy(&aapt_output.stdout));
             println!("stderr: {}", String::from_utf8_lossy(&aapt_output.stderr));
+            
             file_id
         }
         Err(e) => e.to_string()
