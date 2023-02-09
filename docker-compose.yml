@@ -1,0 +1,26 @@
+version: '3.1'
+
+services:
+  database:
+    image: mariadb:10.6
+    container_name: mariadb
+    environment:
+      MARIADB_USER: "mam"
+      MARIADB_PASSWORD: "mam"
+      MARIADB_ROOT_PASSWORD: "toor"
+    networks:
+      - mam_network
+    restart: always
+
+  mam_server:
+    build: .
+    container_name: mam-server
+    ports:
+      - 8000:8000
+    networks:
+      - mam_network
+    restart: always
+
+networks:
+  mam_network:
+    driver: bridge
