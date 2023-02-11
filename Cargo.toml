@@ -31,6 +31,8 @@ diesel = { version = "2.0.0", features = ["mysql_backend", "mysql"] }
 dotenvy = "0.15"
 memfile = "0.2.1"
 android-tools = "0.2.11"
+lazy_static = "1.4.0"
+regex = "1.7.1"
 
 [dependencies.uuid]
 version = "1.2.2"

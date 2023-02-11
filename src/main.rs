@@ -21,6 +21,7 @@ use std::process::Command;
 use memfile::{MemFile, CreateOptions};
 use model::{establish_connection};
 use rabe::error::RabeError;
+use rocket::Response;
 use rocket::{
     serde::json::Json,
     form::Form,
@@ -109,6 +110,25 @@ fn get_secret_key(attributes:  String) -> String {
     }
 }
 
+
+use lazy_static::lazy_static;
+
+use regex::Regex;
+
+fn extract_android_app_label(input: &str) -> String {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r"application-label:'[a-zA-Z][0-9a-zA-Z_]*'").unwrap();
+    }
+    let mut app_label: String = String::from("");
+    for cap in RE.captures_iter(input) {
+        let label: Vec<&str> = cap[0].split(":").collect();
+        let mut label = label[1].chars();
+        label.next();
+        label.next_back();
+        app_label.push_str(label.as_str());
+    }
+    app_label
+}
 /// Handles APK files upload to the server
 ///
 /// # Arguments
@@ -121,11 +141,9 @@ fn get_secret_key(attributes:  String) -> String {
 fn upload_file(upload_data: Form<UploadData<'_>>) -> String {
     match encrypt_file(PKG_MASTER_DIR_PATH, upload_data.file.data, &upload_data.policy) {
         Ok(file_id) => {
-            // let conn = &mut establish_connection();
-            // create_ciphertext_file(conn, upload_data.file.data., &file_id.as_str());
             use std::io::Write;
             use memfile::{MemFile, CreateOptions, Seal};
-
+            
             
             let mut temp_memfile = MemFile::create(&file_id, CreateOptions::new().allow_sealing(true)).unwrap();
             temp_memfile.write_all(upload_data.file.data);
@@ -144,25 +162,35 @@ fn upload_file(upload_data: Form<UploadData<'_>>) -> String {
                 .arg("dump")
                 .arg("badging")
                 .arg(&apk_path_string).output().expect("Failed");
-            println!("status: {}", aapt_output.status);
-            println!("stdout: {}", String::from_utf8_lossy(&aapt_output.stdout));
-            println!("stderr: {}", String::from_utf8_lossy(&aapt_output.stderr));
-            
-            file_id
+                
+                let output_string = String::from_utf8_lossy(&aapt_output.stdout).to_string();
+                
+                let extracted_name = extract_android_app_label(&output_string);
+                
+                let mut app_name = String::new();
+                if extracted_name.eq("") {
+                    app_name.push_str("Unkown");
+                } else {
+                    app_name.push_str(extracted_name.as_str());
+                }
+                
+                let conn = &mut establish_connection();
+                create_ciphertext_file(conn, &app_name, &file_id.as_str());
+                file_id
+            }
+            Err(e) => e.to_string()
         }
-        Err(e) => e.to_string()
     }
-}
-
-/// Returns a plaintext file given the right secret key and file ID
-/// TODO: Need to add a database to store the original associated to the encrypted file ID
-/// # Arguments
-///
-///	* `decryption_data` - JSON formated data matching the attributes of the DecryptionData struct
-///
-#[post("/getFile", format = "application/json", data = "<decryption_data>")]
-fn get_file(decryption_data: Json<DecryptionData>) -> Result<Vec<u8>, String> {
-
+    
+    /// Returns a plaintext file given the right secret key and file ID
+    /// TODO: Need to add a database to store the original associated to the encrypted file ID
+    /// # Arguments
+    ///
+    ///	* `decryption_data` - JSON formated data matching the attributes of the DecryptionData struct
+    ///
+    #[post("/getFile", format = "application/json", data = "<decryption_data>")]
+    fn get_file(decryption_data: Json<DecryptionData>) -> Result<Vec<u8>, String> {
+        
     let mut file_path_string = UPLOAD_PATH.to_string();
     file_path_string.push_str(&decryption_data.id);
     file_path_string.push_str(".ct");
