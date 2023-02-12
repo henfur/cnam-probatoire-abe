@@ -6,6 +6,8 @@ use serde::{
     Deserialize
 };
 
+// use crate::schema::ciphertext_files::ciphertext_id;
+// use crate::schema::ciphertext_files::original_file_name;
 use crate::schema::users;
 use crate::schema::ciphertext_files;
 
@@ -33,9 +35,16 @@ pub struct NewUser<'a> {
     pub email: &'a str
 }
 
-#[derive(Queryable, Insertable, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Queryable, Debug, PartialEq, Eq, Deserialize)]
+pub struct CiphertextFile {
+    pub original_file_name: String,
+    pub ciphertext_id: String
+}
+
+
+#[derive(Insertable, Debug, PartialEq, Eq, Deserialize)]
 #[diesel(table_name = ciphertext_files)]
-pub struct CiphertextFile<'a> {
+pub struct NewCiphertextFile<'a> {
     pub original_file_name: &'a str,
     pub ciphertext_id: &'a str
 }
@@ -52,10 +61,26 @@ pub fn create_user(conn: &mut MysqlConnection, username: &str, email: &str) -> (
 
 pub fn create_ciphertext_file(conn: &mut MysqlConnection, original_file_name: &str, ciphertext_id: &str) -> () {
 
-    let new_ciphertext_file = CiphertextFile{ original_file_name, ciphertext_id };
+    let new_ciphertext_file = NewCiphertextFile{ original_file_name, ciphertext_id };
 
     diesel::insert_into(ciphertext_files::table)
         .values(&new_ciphertext_file)
         .execute(conn)
         .unwrap();
 }
+
+pub fn get_ciphertext_id_from_name(conn: &mut MysqlConnection, requested_name: &str) -> String {
+    use crate::schema::ciphertext_files::dsl::*;
+
+    let results = ciphertext_files
+        .filter(original_file_name.eq(requested_name))
+        .load::<CiphertextFile>(conn)
+        .expect("Could not load CiphertextFile");
+
+    if results.len() == 1 {
+        results[0].ciphertext_id.to_string()
+    } else {
+        String::from("")
+    }
+}
+

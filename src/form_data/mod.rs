@@ -42,7 +42,7 @@ pub struct UploadData<'r> {
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct DecryptionData{
-    pub id: String,
+    pub app_name: String,
     pub secret_key: String
 }
 

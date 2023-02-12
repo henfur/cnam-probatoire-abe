@@ -7,7 +7,7 @@ services:
     environment:
       MARIADB_USER: "mam"
       MARIADB_PASSWORD: "mam"
-      MARIADB_ROOT_PASSWORD: "toor"
+      MARIADB_ROOT_PASSWORD: "changeit"
     networks:
       - mam_network
     restart: always
